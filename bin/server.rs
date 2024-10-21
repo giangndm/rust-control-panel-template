@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use rust_control_panel_template::{http::run_http_server, prisma::PrismaClient};
+use rust_control_panel_template::{
+    http::run_http_server,
+    prisma::{admin_user, PrismaClient},
+};
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 #[tokio::main]
@@ -19,5 +22,19 @@ async fn main() -> anyhow::Result<()> {
     let client = PrismaClient::_builder().build().await?;
     let client = Arc::new(client);
 
-    run_http_server(client).await
+    let _ = client
+        .admin_user()
+        .create(
+            "giang.ndm@gmail.com".to_owned(),
+            vec![admin_user::SetParam::SetActive(true)],
+        )
+        .exec()
+        .await;
+
+    run_http_server(
+        "dev-tnxbxx784nmjqzaz.us.auth0.com",
+        "Rt8hHIFCgUHug4KGXOAR2EPi6fvu1cuM",
+        client,
+    )
+    .await
 }
