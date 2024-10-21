@@ -6,7 +6,7 @@ This is a template for building Rust applications with an embedded control panel
 
 - **Poem**: A web server framework for Rust.
 - **Prisma**: For database queries.
-- **React Admin**: For auto-generating the admin page.
+- **Refine.dev**: For admin page.
 - **Auth0**: For user authentication.
 
 ## Commands
