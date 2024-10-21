@@ -21,13 +21,13 @@ struct JwtParams {
 pub struct AuthMidleware {
     db: Arc<prisma::PrismaClient>,
     jwks: Arc<jwks::Jwks>,
-    auth0_audience: String,
+    auth0_client_id: String,
 }
 
 impl AuthMidleware {
     pub async fn new(
         auth0_domain: &str,
-        auth0_audience: &str,
+        auth0_client_id: &str,
         db: Arc<prisma::PrismaClient>,
     ) -> Self {
         let jwks =
@@ -38,7 +38,7 @@ impl AuthMidleware {
         Self {
             db,
             jwks: jwks.into(),
-            auth0_audience: auth0_audience.to_owned(),
+            auth0_client_id: auth0_client_id.to_owned(),
         }
     }
 }
@@ -51,7 +51,7 @@ impl<E: Endpoint> Middleware<E> for AuthMidleware {
             endpoint: ep,
             db: self.db.clone(),
             jwks: self.jwks.clone(),
-            auth0_audience: self.auth0_audience.clone(),
+            auth0_client_id: self.auth0_client_id.clone(),
         }
     }
 }
@@ -60,7 +60,7 @@ pub struct AuthMidlewareImpl<E> {
     endpoint: E,
     db: Arc<prisma::PrismaClient>,
     jwks: Arc<jwks::Jwks>,
-    auth0_audience: String,
+    auth0_client_id: String,
 }
 
 impl<E: Endpoint> Endpoint for AuthMidlewareImpl<E> {
@@ -102,7 +102,7 @@ impl<E: Endpoint> Endpoint for AuthMidlewareImpl<E> {
         ))?;
 
         let mut validation = jsonwebtoken::Validation::new(header.alg);
-        validation.set_audience(&[&self.auth0_audience]);
+        validation.set_audience(&[&self.auth0_client_id]);
 
         let decoded_token =
             jsonwebtoken::decode::<JwtParams>(token, &jwk.decoding_key, &validation)

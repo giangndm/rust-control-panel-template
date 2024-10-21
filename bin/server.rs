@@ -1,10 +1,23 @@
-use std::sync::Arc;
-
+use clap::Parser;
 use rust_control_panel_template::{
     http::run_http_server,
     prisma::{admin_user, PrismaClient},
 };
+use std::sync::Arc;
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+
+/// Demo control panel server with Rust and Refine.dev
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Auth0 domain
+    #[arg(env, long)]
+    auth0_domain: String,
+
+    /// Auth0 client_id
+    #[arg(env, long)]
+    auth0_client_id: String,
+}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -14,6 +27,7 @@ async fn main() -> anyhow::Result<()> {
     if std::env::var_os("RUST_BACKTRACE").is_none() {
         std::env::set_var("RUST_BACKTRACE", "1");
     }
+    let args = Args::parse();
     tracing_subscriber::registry()
         .with(fmt::layer())
         .with(EnvFilter::from_default_env())
@@ -31,10 +45,5 @@ async fn main() -> anyhow::Result<()> {
         .exec()
         .await;
 
-    run_http_server(
-        "dev-tnxbxx784nmjqzaz.us.auth0.com",
-        "Rt8hHIFCgUHug4KGXOAR2EPi6fvu1cuM",
-        client,
-    )
-    .await
+    run_http_server(&args.auth0_domain, &args.auth0_client_id, client).await
 }
