@@ -5,9 +5,7 @@ use http::StatusCode;
 use poem::{EndpointExt, IntoResponse, Response, Route};
 use serde::{Deserialize, Serialize};
 
-use crate::prisma;
-
-mod admin_user;
+mod api_admin_user;
 mod auth;
 mod emdedded_files;
 
@@ -23,10 +21,10 @@ struct ListQuery {
 pub async fn build_route(
     auth0_domain: &str,
     auth0_client_id: &str,
-    db: Arc<prisma::PrismaClient>,
+    db: Arc<dyn welds::Client>,
 ) -> AuthMidlewareImpl<Route> {
     Route::new()
-        .nest("/admin_user", admin_user::build_route())
+        .nest("/admin_user", api_admin_user::build_route())
         .with(AuthMidleware::new(auth0_domain, auth0_client_id, db).await)
 }
 
