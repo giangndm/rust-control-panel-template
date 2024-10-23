@@ -2,8 +2,6 @@ use std::sync::Arc;
 
 use poem::{listener::TcpListener, middleware::Tracing, EndpointExt, Route, Server};
 
-use crate::prisma;
-
 mod api_admin;
 #[allow(unused)]
 mod dev_proxy;
@@ -11,7 +9,7 @@ mod dev_proxy;
 pub async fn run_http_server(
     auth0_domain: &str,
     auth0_client_id: &str,
-    client: Arc<prisma::PrismaClient>,
+    client: Arc<dyn welds::Client>,
 ) -> anyhow::Result<()> {
     let admin = api_admin::build_route(auth0_domain, auth0_client_id, client.clone()).await;
 

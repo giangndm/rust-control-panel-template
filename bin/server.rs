@@ -1,7 +1,7 @@
 use clap::Parser;
 use rust_control_panel_template::{
     http::run_http_server,
-    prisma::{admin_user, PrismaClient},
+    schema::{self, AdminUser},
 };
 use std::sync::Arc;
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
@@ -17,6 +17,10 @@ struct Args {
     /// Auth0 client_id
     #[arg(env, long)]
     auth0_client_id: String,
+
+    /// Database url
+    #[arg(env, long, default_value = "sqlite::memory:")]
+    database_url: String,
 }
 
 #[tokio::main]
@@ -33,17 +37,29 @@ async fn main() -> anyhow::Result<()> {
         .with(EnvFilter::from_default_env())
         .init();
 
-    let client = PrismaClient::_builder().build().await?;
-    let client = Arc::new(client);
+    let client: Arc<dyn welds::Client> = if args.database_url.starts_with("sqlite:") {
+        let client = welds::connections::sqlite::connect(&args.database_url).await?;
+        schema::up_migrations(&client).await?;
+        schema::check_tables(&client).await?;
+        Arc::from(client)
+    } else if args.database_url.starts_with("mysql:") {
+        let client = welds::connections::mysql::connect(&args.database_url).await?;
+        schema::up_migrations(&client).await?;
+        schema::check_tables(&client).await?;
+        Arc::from(client)
+    } else if args.database_url.starts_with("postgres:") {
+        let client = welds::connections::postgres::connect(&args.database_url).await?;
+        schema::up_migrations(&client).await?;
+        schema::check_tables(&client).await?;
+        Arc::from(client)
+    } else {
+        anyhow::bail!("Unsupported database url: {}", args.database_url)
+    };
 
-    let _ = client
-        .admin_user()
-        .create(
-            "giang.ndm@gmail.com".to_owned(),
-            vec![admin_user::SetParam::SetActive(true)],
-        )
-        .exec()
-        .await;
+    let mut admin_user = AdminUser::new();
+    admin_user.email = "giang.ndm@gmail.com".to_owned();
+    admin_user.active = true;
+    admin_user.save(client.as_ref()).await?;
 
     run_http_server(&args.auth0_domain, &args.auth0_client_id, client).await
 }

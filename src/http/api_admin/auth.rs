@@ -4,10 +4,7 @@ use http::StatusCode;
 use poem::{Endpoint, Error, IntoResponse, Middleware, Request, Response, Result};
 use serde::Deserialize;
 
-use crate::prisma::{
-    self, admin_user,
-    read_filters::{BoolFilter, StringFilter},
-};
+use crate::schema::AdminUser;
 
 #[allow(unused)]
 #[derive(Debug, Deserialize)]
@@ -19,7 +16,7 @@ struct JwtParams {
 }
 
 pub struct AuthMidleware {
-    db: Arc<prisma::PrismaClient>,
+    db: Arc<dyn welds::Client>,
     jwks: Arc<jwks::Jwks>,
     auth0_client_id: String,
 }
@@ -28,7 +25,7 @@ impl AuthMidleware {
     pub async fn new(
         auth0_domain: &str,
         auth0_client_id: &str,
-        db: Arc<prisma::PrismaClient>,
+        db: Arc<dyn welds::Client>,
     ) -> Self {
         let jwks =
             jwks::Jwks::from_jwks_url(format!("https://{auth0_domain}/.well-known/jwks.json"))
@@ -58,7 +55,7 @@ impl<E: Endpoint> Middleware<E> for AuthMidleware {
 
 pub struct AuthMidlewareImpl<E> {
     endpoint: E,
-    db: Arc<prisma::PrismaClient>,
+    db: Arc<dyn welds::Client>,
     jwks: Arc<jwks::Jwks>,
     auth0_client_id: String,
 }
@@ -113,20 +110,26 @@ impl<E: Endpoint> Endpoint for AuthMidlewareImpl<E> {
             StatusCode::BAD_REQUEST,
         ))?;
 
-        let _user = self
-            .db
-            .admin_user()
-            .find_first(vec![admin_user::WhereParam::And(vec![
-                admin_user::WhereParam::Email(StringFilter::Equals(email)),
-                admin_user::WhereParam::Active(BoolFilter::Equals(true)),
-            ])])
-            .exec()
+        let users = AdminUser::where_col(|col| col.email.equal(email.clone()))
+            .run(self.db.as_ref())
             .await
-            .map_err(|e| Error::from_string(e.to_string(), StatusCode::INTERNAL_SERVER_ERROR))?
-            .ok_or(Error::from_string(
+            .map_err(|e| Error::from_string(e.to_string(), StatusCode::INTERNAL_SERVER_ERROR))?;
+
+        if users.is_empty() {
+            return Err(Error::from_string(
+                "user not found",
+                StatusCode::BAD_REQUEST,
+            ));
+        }
+
+        let user = users.first().expect("should have at least one user");
+
+        if !user.active {
+            return Err(Error::from_string(
                 "user not actived",
                 StatusCode::BAD_REQUEST,
-            ))?;
+            ));
+        }
 
         let res = self.endpoint.call(req).await;
         match res {
