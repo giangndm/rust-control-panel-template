@@ -5,7 +5,7 @@ This is a template for building Rust applications with an embedded control panel
 ## Components
 
 - **Poem**: A web server framework for Rust.
-- **Prisma**: For database queries.
+- **Welds**: For database queries.
 - **Refine.dev**: For admin page.
 - **Auth0**: For user authentication.
 
