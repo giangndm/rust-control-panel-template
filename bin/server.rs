@@ -18,9 +18,17 @@ struct Args {
     #[arg(env, long)]
     auth0_client_id: String,
 
+    /// Auth0 audience
+    #[arg(env, long)]
+    auth0_audience: String,
+
     /// Database url
     #[arg(env, long, default_value = "sqlite::memory:")]
     database_url: String,
+
+    /// Default admin-user email
+    #[arg(env, long)]
+    default_admin_email: String,
 }
 
 #[tokio::main]
@@ -56,10 +64,18 @@ async fn main() -> anyhow::Result<()> {
         anyhow::bail!("Unsupported database url: {}", args.database_url)
     };
 
-    let mut admin_user = AdminUser::new();
-    admin_user.email = "giang.ndm@gmail.com".to_owned();
-    admin_user.active = true;
-    admin_user.save(client.as_ref()).await?;
+    if AdminUser::all().count(client.as_ref()).await? == 0 {
+        let mut admin_user = AdminUser::new();
+        admin_user.email = args.default_admin_email;
+        admin_user.active = true;
+        admin_user.save(client.as_ref()).await?;
+    }
 
-    run_http_server(&args.auth0_domain, &args.auth0_client_id, client).await
+    run_http_server(
+        &args.auth0_domain,
+        &args.auth0_client_id,
+        &args.auth0_audience,
+        client,
+    )
+    .await
 }
